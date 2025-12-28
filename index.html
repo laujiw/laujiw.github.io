@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>诗词雅趣 - Poetry Card Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap');
+
+        :root {
+            --color-paper: #fdfbf7;
+            --color-ink: #2b2b2b;
+            --color-cinnabar: #cb3a56;
+            --color-bamboo: #789262;
+            --color-indigo: #1661ab;
+            --color-gold: #b5853f;
+            --color-wash: #e6e6e6;
+        }
+
+        body {
+            font-family: 'Noto Serif SC', serif;
+            background-color: var(--color-paper);
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+            color: var(--color-ink);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Card Flip Animation */
+        .perspective {
+            perspective: 1000px;
+        }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .card:hover .card-front {
+             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .card-front {
+            background-color: #fff;
+            border: 2px solid var(--color-gold);
+            color: var(--color-ink);
+        }
+        .card-back {
+            transform: rotateY(180deg);
+            padding: 0.5rem;
+            flex-direction: column;
+        }
+
+        /* Ink Pulse Effect for Traps */
+        @keyframes inkPulse {
+            0% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 0 0 rgba(43, 43, 43, 0.7); }
+            50% { transform: scale(1.02); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 20px rgba(43, 43, 43, 0); }
+        }
+        
+        .ink-reveal {
+            animation: inkPulse 0.8s ease-out forwards;
+        }
+
+        /* Custom Colors & Utilities */
+        .bg-paper { background-color: var(--color-paper); }
+        .text-cinnabar { color: var(--color-cinnabar); }
+
+        /* Rank Badge Styles */
+        .rank-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: white;
+        }
+        .rank-1 { background-color: #a0aec0; } /* TongSheng */
+        .rank-2 { background-color: #789262; } /* XiuCai */
+        .rank-3 { background-color: #1661ab; } /* JuRen */
+        .rank-4 { background-color: #b5853f; } /* GongShi */
+        .rank-5 { background-color: #cb3a56; } /* JinShi */
+        .rank-6 { background: linear-gradient(45deg, #b5853f, #cb3a56); } /* HanLin */
+
+        /* Stamp Animation */
+        @keyframes stamp-in {
+            0% { transform: scale(3) rotate(20deg); opacity: 0; }
+            80% { transform: scale(0.9) rotate(-2deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        .stamp-seal {
+            width: 100px;
+            height: 100px;
+            border: 4px solid #cb3a56;
+            border-radius: 8px;
+            color: #cb3a56;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            font-family: serif;
+            transform: rotate(-5deg);
+            opacity: 0.8;
+            mask-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.5'/%3E%3C/svg%3E");
+            animation: stamp-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .bg-cinnabar { background-color: var(--color-cinnabar); }
+        .text-bamboo { color: var(--color-bamboo); }
+        .bg-bamboo { background-color: var(--color-bamboo); }
+        .text-indigo { color: var(--color-indigo); }
+        .bg-indigo { background-color: var(--color-indigo); }
+        
+        .chinese-border {
+            border: 2px solid var(--color-ink);
+            position: relative;
+        }
+        .chinese-border::after {
+            content: '';
+            position: absolute;
+            top: 4px; left: 4px; right: 4px; bottom: 4px;
+            border: 1px solid var(--color-ink);
+            pointer-events: none;
+        }
+
+        .ink-cursor {
+            cursor: pointer;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--color-paper); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-gold); 
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center relative overflow-x-hidden" onclick="AudioSys.init(); AudioSys.startInkAmbient()">
+
+    <!-- Dynamic Ink Background -->
+    <canvas id="inkCanvas" class="fixed inset-0 w-full h-full pointer-events-none z-0 opacity-40"></canvas>
+
+    <!-- Header -->
+    <header class="w-full py-8 text-center mb-2 z-10 relative">
+        <div class="absolute top-4 right-4 flex gap-2">
+            <button onclick="AudioSys.toggleBGM()" id="bgmBtn" class="p-2 rounded-full border border-gray-300 hover:bg-gray-100 text-xs text-gray-500 transition">
+                🎵 雅乐: 关
+            </button>
+            <div id="userRank" class="px-3 py-2 rounded-full border border-gold bg-paper shadow-sm text-xs font-bold text-gold flex items-center gap-2 cursor-pointer" onclick="UserSys.showProfile()">
+                <span>🎓 童生</span>
+            </div>
+        </div>
+
+        <h1 class="text-5xl font-bold tracking-[0.2em] text-cinnabar mb-3" style="text-shadow: 1px 1px 0px rgba(0,0,0,0.1); font-family: 'Noto Serif SC', serif;">诗词雅趣</h1>
+        <div class="flex items-center justify-center gap-3">
+            <span class="block w-8 h-[1px] bg-gold"></span>
+            <p class="text-sm text-gray-500 tracking-widest font-serif">品味古韵 · 寓教于乐</p>
+            <span class="block w-8 h-[1px] bg-gold"></span>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main id="app" class="flex-1 w-full max-w-6xl px-4 pb-10 flex flex-col items-center relative">
+        <!-- Content injected by JS -->
+    </main>
+
+    <!-- Modal Overlay -->
+    <div id="modal" class="fixed inset-0 bg-black/20 hidden items-center justify-center z-50 backdrop-blur-md transition-all duration-300">
+        <div class="bg-paper p-8 rounded-lg shadow-2xl max-w-2xl w-full relative chinese-border m-4 max-h-[90vh] overflow-y-auto transform transition-all scale-100">
+            <button id="closeModal" class="absolute top-4 right-4 text-2xl text-gray-400 hover:text-cinnabar transition">&times;</button>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- Web Audio API System ---
+        const AudioSys = {
+            ctx: null,
+            bgmNode: null,
+            bgmInterval: null,
+            isBGMPlaying: false,
+            init: function() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        this.ctx = new AudioContext();
+                        this.startInkAmbient();
+                    }
+                } else if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            toggleBGM: function() {
+                this.init();
+                const btn = document.getElementById('bgmBtn');
+                if (this.isBGMPlaying) {
+                    this.stopBGM();
+                    btn.innerText = "🎵 雅乐: 关";
+                    btn.classList.remove('text-indigo-600', 'border-indigo-600');
+                    btn.classList.add('text-gray-500');
+                } else {
+                    this.startBGM();
+                    btn.innerText = "🎵 雅乐: 开";
+                    btn.classList.add('text-indigo-600', 'border-indigo-600');
+                    btn.classList.remove('text-gray-500');
+                }
+            },
+            startBGM: function() {
+                if (!this.ctx) return;
+                this.isBGMPlaying = true;
+                // Pentatonic Scale (Gong, Shang, Jue, Zhi, Yu)
+                // C4, D4, E4, G4, A4
+                const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25]; 
+                
+                this.bgmInterval = setInterval(() => {
+                    if (!this.isBGMPlaying) return;
+                    // Play a random note occasionally to simulate Guqin
+                    if (Math.random() > 0.6) {
+                        const freq = scale[Math.floor(Math.random() * scale.length)];
+                        this.playTone(freq, 2, 'triangle', 0.1);
+                    }
+                }, 1500);
+            },
+            stopBGM: function() {
+                this.isBGMPlaying = false;
+                if (this.bgmInterval) clearInterval(this.bgmInterval);
+            },
+            playTone: function(freq, duration, type = 'sine', vol = 0.5) {
+                if (!this.ctx) return;
+                try {
+                    const t = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, t);
+                    
+                    gain.gain.setValueAtTime(0, t);
+                    gain.gain.linearRampToValueAtTime(vol, t + 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+                    // Add Reverb-like effect via simple filter
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 800;
+
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.start();
+                    osc.stop(t + duration);
+                } catch(e){}
+            },
+            playFlip: function() {
+                if (!this.ctx) return;
+                try {
+                    const t = this.ctx.currentTime;
+                    const bufferSize = this.ctx.sampleRate * 0.15;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(1200, t);
+                    filter.frequency.exponentialRampToValueAtTime(300, t + 0.15);
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(0.3, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    noise.start();
+                } catch(e) { console.error(e); }
+            },
+            playInk: function() {
+                if (!this.ctx) return;
+                try {
+                    const t = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, t);
+                    osc.frequency.exponentialRampToValueAtTime(100, t + 0.4);
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(0, t);
+                    gain.gain.linearRampToValueAtTime(0.5, t + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(t + 0.5);
+                } catch(e) { console.error(e); }
+            },
+            playWin: function() {
+                if (!this.ctx) return;
+                try {
+                    const t = this.ctx.currentTime;
+                    [0, 0.1, 0.2].forEach((delay, i) => {
+                        this.playTone(440 + (i*110), 0.6, 'triangle', 0.2);
+                    });
+                } catch(e) {}
+            },
+            startInkAmbient: function() {
+                // Subtle ambient setup if needed
+            }
+        };
+
+        // --- Visual System (Ink Background) ---
+        const VisualSys = {
+            canvas: null,
+            ctx: null,
+            particles: [],
+            width: 0,
+            height: 0,
+            init: function() {
+                this.canvas = document.getElementById('inkCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                
+                // Track mouse
+                document.addEventListener('mousemove', (e) => {
+                    if (Math.random() > 0.8) {
+                        this.addParticle(e.clientX, e.clientY);
+                    }
+                });
+
+                this.animate();
+            },
+            resize: function() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.canvas.width = this.width;
+                this.canvas.height = this.height;
+            },
+            addParticle: function(x, y) {
+                this.particles.push({
+                    x: x,
+                    y: y,
+                    radius: Math.random() * 10 + 5,
+                    alpha: 0.5,
+                    growth: Math.random() * 0.5 + 0.1
+                });
+            },
+            animate: function() {
+                this.ctx.clearRect(0, 0, this.width, this.height);
+                
+                for (let i = 0; i < this.particles.length; i++) {
+                    const p = this.particles[i];
+                    p.radius += p.growth;
+                    p.alpha -= 0.005;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    this.ctx.fillStyle = `rgba(43, 43, 43, ${p.alpha})`; // Ink color
+                    this.ctx.fill();
+                    
+                    if (p.alpha <= 0) {
+                        this.particles.splice(i, 1);
+                        i--;
+                    }
+                }
+                requestAnimationFrame(() => this.animate());
+            }
+        };
+
+        // --- User System (Ranks & Gamification) ---
+        const UserSys = {
+            data: {
+                xp: 0,
+                rankIndex: 0,
+                stamps: [] // Collection of stamps
+            },
+            ranks: [
+                { name: "童生", minXp: 0 },
+                { name: "秀才", minXp: 100 },
+                { name: "举人", minXp: 300 },
+                { name: "贡士", minXp: 600 },
+                { name: "进士", minXp: 1000 },
+                { name: "翰林", minXp: 2000 }
+            ],
+            init: function() {
+                const saved = localStorage.getItem('shici_user');
+                if (saved) {
+                    this.data = JSON.parse(saved);
+                }
+                this.updateUI();
+            },
+            addXP: function(amount) {
+                this.data.xp += amount;
+                this.checkRankUp();
+                this.save();
+                this.updateUI();
+            },
+            addStamp: function(name) {
+                if (!this.data.stamps.includes(name)) {
+                    this.data.stamps.push(name);
+                    this.save();
+                }
+            },
+            checkRankUp: function() {
+                let newIndex = 0;
+                this.ranks.forEach((r, i) => {
+                    if (this.data.xp >= r.minXp) newIndex = i;
+                });
+                if (newIndex > this.data.rankIndex) {
+                    this.data.rankIndex = newIndex;
+                    alert(`🎉 恭喜！您已晋升为【${this.ranks[newIndex].name}】`);
+                }
+            },
+            save: function() {
+                localStorage.setItem('shici_user', JSON.stringify(this.data));
+            },
+            updateUI: function() {
+                const el = document.getElementById('userRank');
+                if(el) {
+                    const r = this.ranks[this.data.rankIndex];
+                    el.innerHTML = `<span>🎓 ${r.name}</span> <span class="text-[10px] opacity-60">(${this.data.xp})</span>`;
+                }
+            },
+            showProfile: function() {
+                const r = this.ranks[this.data.rankIndex];
+                const nextR = this.ranks[this.data.rankIndex + 1];
+                let progress = 100;
+                if (nextR) {
+                    progress = ((this.data.xp - r.minXp) / (nextR.minXp - r.minXp)) * 100;
+                }
+
+                showModal(`
+                    <div class="text-center">
+                        <h2 class="text-2xl font-bold mb-4 text-cinnabar">我的雅集</h2>
+                        <div class="mb-6 p-4 bg-paper border chinese-border rounded">
+                            <div class="text-3xl font-bold text-ink mb-1">${r.name}</div>
+                            <div class="text-xs text-gray-500 mb-2">当前文位</div>
+                            <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-1">
+                                <div class="h-full bg-gold" style="width: ${progress}%"></div>
+                            </div>
+                            <div class="text-xs text-right text-gray-400">${this.data.xp} / ${nextR ? nextR.minXp : 'MAX'}</div>
+                        </div>
+
+                        <h3 class="text-lg font-bold mb-3 text-left border-b pb-1">成就印章</h3>
+                        <div class="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto">
+                            ${this.data.stamps.length > 0 ? this.data.stamps.map(s => `
+                                <div class="aspect-square border border-red-200 bg-red-50 rounded flex items-center justify-center p-2">
+                                    <div class="border-2 border-red-400 w-full h-full rounded flex items-center justify-center text-red-500 font-serif font-bold text-xs transform rotate-[-5deg]">
+                                        ${s}
+                                    </div>
+                                </div>
+                            `).join('') : '<div class="col-span-3 text-sm text-gray-400 py-4">暂无印章，请多参与对弈。</div>'}
+                        </div>
+                        
+                        <div class="mt-6">
+                             <button onclick="closeModal()" class="px-6 py-2 bg-gray-800 text-white rounded">关闭</button>
+                        </div>
+                    </div>
+                `);
+            }
+        };
+
+        // --- Data: Poetry & Imagery ---
+        // Mode 1 & 2 Database
+        const mainDatabase = [
+          { image: "鹅", verse: "鹅，鹅，鹅，曲项向天歌。", source: "骆宾王《咏鹅》" },
+          { image: "春", verse: "春眠不觉晓，处处闻啼鸟。", source: "孟浩然《春晓》" },
+          { image: "月", verse: "床前明月光，疑是地上霜。", source: "李白《静夜思》" },
+          { image: "月", verse: "举头望明月，低头思故乡。", source: "李白《静夜思》" },
+          { image: "风", verse: "解落三秋叶，能开二月花。", source: "李峤《风》" },
+          { image: "莲", verse: "江南可采莲，莲叶何田田。", source: "汉乐府《江南》" },
+          { image: "柳", verse: "碧玉妆成一树高，万条垂下绿丝绦。", source: "贺知章《咏柳》" },
+          { image: "朝露", verse: "青青园中葵，朝露待日晞", source: "汉乐府《长歌行》" },
+          { image: "时光", verse: "少壮不努力，老大徒伤悲。", source: "汉乐府《长歌行》" },
+          { image: "白日", verse: "白日依山尽，黄河入海流", source: "王之涣《登鹳雀楼》" },
+          { image: "黄河", verse: "白日依山尽，黄河入海流", source: "王之涣《登鹳雀楼》" },
+          { image: "登楼", verse: "欲穷千里目，更上一层楼。", source: "王之涣《登鹳雀楼》" },
+          { image: "夜光杯", verse: "葡萄美酒夜光杯，欲饮琵琶马上催。", source: "王翰《凉州词》" },
+          { image: "沙场", verse: "醉卧沙场君莫笑，古来征战几人回？", source: "王翰《凉州词》" },
+          { image: "边关", verse: "秦时明月汉时关，万里长征人未还。", source: "王昌龄《出塞》" },
+          { image: "马", verse: "但使龙城飞将在，不教胡马度阴山。", source: "王昌龄《出塞》" },
+          { image: "冰心", verse: "洛阳亲友如相问，一片冰心在玉壶。", source: "王昌龄《芙蓉楼送辛渐》" },
+          { image: "草", verse: "天苍苍，野茫茫，风吹草低见牛羊。", source: "北朝民歌《敕勒歌》" },
+          { image: "乡音", verse: "少小离家老大回，乡音无改鬓毛衰。", source: "贺知章《回乡偶书》" },
+          { image: "儿童", verse: "儿童相见不相识，笑问客从何处来", source: "贺知章《回乡偶书》" },
+          { image: "黄河", verse: "黄河远上白云间，一片孤城万仞山。", source: "王之涣《凉州词》" },
+          { image: "孤城", verse: "黄河远上白云间，一片孤城万仞山。", source: "王之涣《凉州词》" },
+          { image: "羌笛", verse: "羌笛何须怨杨柳，春风不度玉门关。", source: "王之涣《凉州词》" },
+          { image: "春风", verse: "羌笛何须怨杨柳，春风不度玉门关。", source: "王之涣《凉州词》" },
+          { image: "玉门关", verse: "羌笛何须怨杨柳，春风不度玉门关。", source: "王之涣《凉州词》" },
+          { image: "空山", verse: "空山不见人，但闻人语响。", source: "王维《鹿柴》" },
+          { image: "青苔", verse: "返景入深林，复照青苔上。", source: "王维《鹿柴》" },
+          { image: "粟", verse: "春种一粒粟，秋收万颗子。", source: "李绅《悯农》其一" },
+          { image: "农夫", verse: "四海无闲田，农夫犹饿死", source: "李绅《悯农》其一" },
+          { image: "汗", verse: "锄禾日当午，汗滴禾下土。", source: "李绅《悯农》其二" },
+          { image: "餐", verse: "谁知盘中餐，粒粒皆辛苦", source: "李绅《悯农》其二" },
+          { image: "渭城驿", verse: "渭城朝雨浥轻尘，客舍青青柳色新", source: "王维《送元二使安西》" },
+          { image: "阳关", verse: "劝君更尽一杯酒，西出阳关无故人。", source: "王维《送元二使安西》" },
+          { image: "酒", verse: "劝君更尽一杯酒，西出阳关无故人。", source: "王维《送元二使安西》" },
+          { image: "故人", verse: "劝君更尽一杯酒，西出阳关无故人。", source: "王维《送元二使安西》" },
+          { image: "送别", verse: "劝君更尽一杯酒，西出阳关无故人。", source: "王维《送元二使安西》" },
+          { image: "佳节", verse: "独在异乡为异客，每逢佳节倍思亲。", source: "王维《九月九日忆山东兄弟》" },
+          { image: "登高", verse: "遥知兄弟登高处，遍插茱萸少一人。", source: "王维《九月九日忆山东兄弟》" },
+          { image: "茱萸", verse: "遥知兄弟登高处，遍插茱萸少一人。", source: "王维《九月九日忆山东兄弟》" },
+          { image: "月", verse: "小时不识月，呼作白玉盘。", source: "李白《古朗月行》" },
+          { image: "紫烟", verse: "日照香炉生紫烟，遥看瀑布挂前川。", source: "李白《望庐山瀑布》" },
+          { image: "瀑布", verse: "日照香炉生紫烟，遥看瀑布挂前川。", source: "李白《望庐山瀑布》" },
+          { image: "银河", verse: "飞流直下三千尺，疑是银河落九天。", source: "李白《望庐山瀑布》" },
+          { image: "飞流", verse: "飞流直下三千尺，疑是银河落九天。", source: "李白《望庐山瀑布》" },
+          { image: "友情", verse: "桃花潭水深千尺，不及汪伦送我情。", source: "李白《赠汪伦》" },
+          { image: "春雨", verse: "随风潜入夜，润物细无声。", source: "杜甫《春夜喜雨》" },
+          { image: "锦官城", verse: "晓看红湿处，花重锦官城。", source: "杜甫《春夜喜雨》" },
+          { image: "春风", verse: "迟日江山丽，春风花草香。", source: "杜甫《绝句》" },
+          { image: "燕子", verse: "泥融飞燕子，沙暖睡鸳鸯。", source: "杜甫《绝句》" },
+          { image: "鸳鸯", verse: "泥融飞燕子，沙暖睡鸳鸯。", source: "杜甫《绝句》" },
+          { image: "孤帆", verse: "孤帆远影碧空尽，唯见长江天际流。", source: "李白《黄鹤楼送孟浩然之广陵》" },
+          { image: "长江", verse: "孤帆远影碧空尽，唯见长江天际流。", source: "李白《黄鹤楼送孟浩然之广陵》" },
+          { image: "轻舟", verse: "两岸猿声啼不住，轻舟已过万重山。", source: "李白《早发白帝城》" },
+          { image: "猿声", verse: "两岸猿声啼不住，轻舟已过万重山。", source: "李白《早发白帝城》" },
+          { image: "白帝城", verse: "朝辞白帝彩云间，千里江陵一日还。", source: "李白《早发白帝城》" },
+          { image: "孤帆", verse: "两岸青山相对出，孤帆一片日边来。", source: "李白《望天门山》" },
+          { image: "青山", verse: "两岸青山相对出，孤帆一片日边来。", source: "李白《望天门山》" },
+          { image: "天门山", verse: "天门中断楚江开，碧水东流至此回。", source: "李白《望天门山》" },
+          { image: "知己", verse: "莫愁前路无知己，天下谁人不识君？", source: "高适《别董大》" },
+          { image: "白日", verse: "千里黄云白日曛，北风吹雁雪纷纷。", source: "高适《别董大》" },  
+          { image: "北风", verse: "千里黄云白日曛，北风吹雁雪纷纷。", source: "高适《别董大》" },   
+          { image: "雁", verse: "千里黄云白日曛，北风吹雁雪纷纷。", source: "高适《别董大》" },   
+          { image: "雪", verse: "窗含西岭千秋雪，门泊东吴万里船。", source: "杜甫《绝句》" },
+          { image: "黄鹂", verse: "两个黄鹂鸣翠柳，一行白鹭上青天。", source: "杜甫《绝句》" },
+          { image: "柳", verse: "两个黄鹂鸣翠柳，一行白鹭上青天。", source: "杜甫《绝句》" },
+          { image: "白鹭", verse: "两个黄鹂鸣翠柳，一行白鹭上青天。", source: "杜甫《绝句》" },
+          { image: "青天", verse: "两个黄鹂鸣翠柳，一行白鹭上青天。", source: "杜甫《绝句》" },
+          { image: "微风", verse: "黄师塔前江水东，春光懒困倚微风。", source: "杜甫《江畔独步寻花》" },
+          { image: "桃花", verse: "桃花一簇开无主，可爱深红爱浅红？", source: "杜甫《江畔独步寻花》" },
+          { image: "孤舟", verse: "孤舟蓑笠翁，独钓寒江雪。", source: "柳宗元《江雪》" },
+          { image: "雪", verse: "孤舟蓑笠翁，独钓寒江雪。", source: "柳宗元《江雪》" },
+          { image: "鸟", verse: "千山鸟飞绝，万径人踪灭", source: "柳宗元《江雪》" },
+          { image: "千山", verse: "千山鸟飞绝，万径人踪灭", source: "柳宗元《江雪》" },
+          { image: "母爱", verse: "谁言寸草心，报得三春晖。", source: "孟郊《游子吟》" },
+          { image: "慈母", verse: "慈母手中线，游子身上衣。", source: "孟郊《游子吟》" },
+          { image: "游子", verse: "慈母手中线，游子身上衣。", source: "孟郊《游子吟》" },
+          { image: "霜叶", verse: "停车坐爱枫林晚，霜叶红于二月花。", source: "杜牧《山行》" },
+          { image: "人家", verse: "远上寒山石径斜，白云深处有人家。", source: "杜牧《山行》" },
+          { image: "清明", verse: "清明时节雨纷纷，路上行人欲断魂。", source: "杜牧《清明》" },
+          { image: "雨", verse: "清明时节雨纷纷，路上行人欲断魂。", source: "杜牧《清明》" },
+          { image: "行人", verse: "清明时节雨纷纷，路上行人欲断魂。", source: "杜牧《清明》" },
+          { image: "酒家", verse: "借问酒家何处有，牧童遥指杏花村。", source: "杜牧《清明》" },
+          { image: "牧童", verse: "借问酒家何处有，牧童遥指杏花村。", source: "杜牧《清明》" }, 
+          { image: "雨", verse: "天街小雨润如酥，草色遥看近却无。", source: "韩愈《早春呈水部张十八员外》" },
+          { image: "草", verse: "天街小雨润如酥，草色遥看近却无。", source: "韩愈《早春呈水部张十八员外》" },
+          { image: "烟柳", verse: "最是一年春好处，绝胜烟柳满皇都。", source: "韩愈《早春呈水部张十八员外》" },
+          { image: "箬笠", verse: "青箬笠，绿蓑衣，斜风细雨不须归。", source: "张志和《渔歌子》" },
+          { image: "蓑衣", verse: "青箬笠，绿蓑衣，斜风细雨不须归。", source: "张志和《渔歌子》" },
+          { image: "白鹭", verse: "西塞山前白鹭飞，桃花流水鳜鱼肥。", source: "张志和《渔歌子》" },
+          { image: "鳜鱼", verse: "西塞山前白鹭飞，桃花流水鳜鱼肥。", source: "张志和《渔歌子》" },
+          { image: "洞庭", verse: "遥望洞庭山水色，白银盘里一青螺。", source: "刘禹锡《望洞庭》" },
+          { image: "湖光", verse: "湖光秋月两相和，潭面无风镜未磨。", source: "刘禹锡《望洞庭》" },
+          { image: "黄河", verse: "九曲黄河万里沙，浪淘风簸自天涯。", source: "刘禹锡《浪淘沙》" },
+          { image: "银河", verse: "如今直上银河去，同到牵牛织女家。", source: "刘禹锡《浪淘沙》" },
+          { image: "牵牛织女", verse: "如今直上银河去，同到牵牛织女家。", source: "刘禹锡《浪淘沙》" },
+          { image: "渔火", verse: "月落乌啼霜满天，江枫渔火对愁眠。", source: "张继《枫桥夜泊》" },
+          { image: "姑苏城", verse: "姑苏城外寒山寺，夜半钟声到客船。", source: "张继《枫桥夜泊》" },
+          { image: "黄鹂", verse: "独怜幽草涧边生，上有黄鹂深树鸣。", source: "韦应物《滁州西涧》" },
+          { image: "野渡", verse: "春潮带雨晚来急，野渡无人舟自横。", source: "韦应物《滁州西涧》" },
+          { image: "单于", verse: "月黑雁飞高，单于夜遁逃。", source: "卢纶《塞下曲》" },
+          { image: "雪", verse: "欲将轻骑逐，大雪满弓刀。", source: "卢纶《塞下曲》" },
+          { image: "野火", verse: "野火烧不尽，春风吹又生。", source: "白居易《赋得古原草送别》" },
+          { image: "草", verse: "离离原上草，一岁一枯荣。", source: "白居易《赋得古原草送别》" },
+          { image: "娃娃", verse: "小娃撑小艇，偷采白莲回。", source: "白居易《池上》" },
+          { image: "浮萍", verse: "不解藏踪迹，浮萍一道开。", source: "白居易《池上》" },
+          { image: "江南", verse: "江南好，风景旧曾谙。", source: "白居易《忆江南》" },
+          { image: "江南", verse: "日出江花红胜火，春来江水绿如蓝，能不忆江南？", source: "白居易《忆江南》" },
+          { image: "路人", verse: "路人借问遥招手，怕得鱼惊不应人。", source: "胡令能《小儿垂钓》" },
+          { image: "小儿", verse: "蓬头稚子学垂纶，侧坐莓苔草映身。", source: "胡令能《小儿垂钓》" },
+          { image: "童子", verse: "松下问童子，言师采药去。", source: "贾岛《寻隐者不遇》" },
+          { image: "楼台", verse: "南朝四百八十寺，多少楼台烟雨中。", source: "杜牧《江南春》" },
+          { image: "酒旗", verse: "千里莺啼绿映红，水村山郭酒旗风。", source: "杜牧《江南春》" },
+          { image: "蜜", verse: "采得百花成蜜后，为谁辛苦为谁甜。", source: "罗隐《蜂》" },
+          { image: "鲈鱼", verse: "江上往来人，但爱鲈鱼美。", source: "范仲淹《江上渔者》" },
+          { image: "舟", verse: "君看一叶舟，出没风波里。", source: "范仲淹《江上渔者》" },
+          { image: "人杰", verse: "生当作人杰，死亦为鬼雄。", source: "李清照《夏日绝句》" },
+          { image: "屠苏", verse: "爆竹声中一岁除，春风送暖入屠苏", source: "王安石《元日》" },
+          { image: "桃符", verse: "千门万户曈曈日，总把新桃换旧符", source: "王安石《元日》" },
+          { image: "春风", verse: "春风又绿江南岸，明月何时照我还。", source: "王安石《泊船瓜洲》" },
+          { image: "瓜州", verse: "京口瓜洲一水间，钟山只隔数重山。", source: "王安石《泊船瓜洲》" },
+          { image: "田园", verse: "一水护田将绿绕，两山排闼送青来。", source: "王安石《书湖阴先生壁》" },
+          { image: "茅檐", verse: "茅檐长扫净无苔，花木成畦手自栽。", source: "王安石《书湖阴先生壁》" },
+          { image: "乌云", verse: "黑云翻墨未遮山，白雨跳珠乱入船。", source: "苏轼《六月二十七日望湖楼醉书》" },
+          { image: "望湖楼", verse: "卷地风来忽吹散，望湖楼下水如天。", source: "苏轼《六月二十七日望湖楼醉书》" },
+          { image: "西湖", verse: "欲把西湖比西子，淡妆浓抹总相宜。", source: "苏轼《饮湖上初晴后雨》" },
+          { image: "鸭", verse: "竹外桃花三两枝，春江水暖鸭先知。", source: "苏轼《惠崇春江晓景》" },
+          { image: "桃花", verse: "竹外桃花三两枝，春江水暖鸭先知。", source: "苏轼《惠崇春江晓景》" },
+          { image: "庐山", verse: "不识庐山真面目，只缘身在此山中。", source: "苏轼《题西林壁》" },
+          { image: "黄鹂", verse: "绿阴不减来时路，添得黄鹂四五声。", source: "曾几《三衢道中》" },
+          { image: "梅子", verse: "梅子黄时日日晴，小溪泛尽却山行。", source: "曾几《三衢道中》" },
+          { image: "陆游的遗愿", verse: "王师北定中原日，家祭无忘告乃翁。", source: "陆游《示儿》" },
+          { image: "山河", verse: "三万里河东入海，五千仞岳上摩天。", source: "陆游《秋夜将晓篱门迎凉有感》" },
+          { image: "农忙", verse: "昼出耘田夜绩麻，村庄儿女各当家。", source: "范成大《四时田园杂兴》其一" },
+          { image: "童孙", verse: "童孙未解供耕织，也傍桑阴学种瓜。", source: "范成大《四时田园杂兴》其一" },
+          { image: "蜻蜓", verse: "日长篱落无人过，唯有蜻蜓蛱蝶飞。", source: "范成大《四时田园杂兴》其二" },
+          { image: "梅子", verse: "梅子金黄杏子肥，麦花雪白菜花稀。", source: "范成大《四时田园杂兴》其二" },
+          { image: "泉水", verse: "泉眼无声惜细流，树阴照水爱晴柔。", source: "杨万里《小池》" },
+          { image: "蜻蜓", verse: "小荷才露尖尖角，早有蜻蜓立上头。", source: "杨万里《小池》" },
+          { image: "荷花", verse: "接天莲叶无穷碧，映曰荷花别样红。", source: "杨万里《晓出净慈寺送林子方》" },
+          { image: "六月西湖", verse: "毕竟西湖六月中，风光不与四时同。", source: "杨万里《晓出净慈寺送林子方》" },
+          { image: "东风", verse: "等闲识得东风面，万紫千红总是春。", source: "朱熹《春日》" },
+          { image: "歌舞", verse: "山外青山楼外楼，西湖歌舞几时休？", source: "林升《题临安邸》" },
+          { image: "游人", verse: "暖风熏得游人醉，直把杭州作汴州。", source: "林升《题临安邸》" },
+          { image: "红杏", verse: "春色满园关不住，一枝红杏出墙来。", source: "叶绍翁《游园不值》" },
+          { image: "柴扉", verse: "应怜屐齿印苍苔，小扣柴扉久不开。", source: "叶绍翁《游园不值》" },
+          { image: "朱熹的读书感悟", verse: "问渠那得清如许？为有源头活水来。", source: "朱熹《观书有感》" },
+          { image: "子规", verse: "绿遍山原白满川，子规声里雨如烟。", source: "翁卷《乡村四月》" },
+          { image: "蚕桑", verse: "乡村四月闲人少，才了蚕桑又插田。", source: "翁卷《乡村四月》" },
+          { image: "王冕的梅花", verse: "不要人夸好颜色，只留清气满乾坤。", source: "王冕《墨梅》" },
+          { image: "石灰", verse: "粉身碎骨全不怕，要留清白在人间。", source: "于谦《石灰吟》" },
+          { image: "人才", verse: "我劝天公重抖擞，不拘一格降人才。", source: "龚自珍《己亥杂诗》" },
+          { image: "二月杨柳", verse: "草长莺飞二月天，拂堤杨柳醉春烟。", source: "高鼎《村居》" },
+          { image: "儿童", verse: "儿童散学归来早，忙趁东风放纸鸢", source: "高鼎《村居》" },
+          { image: "牧童", verse: "牧童骑黄牛，歌声振林樾。", source: "袁枚《所见》" },
+          { image: "竹", verse: "咬定青山不放松，立根原在破岩中。", source: "郑燮《竹石》" }
+        ];
+
+        // Mode 3 Database
+        const feihuaDatabase = [
+            { image: "月", verse: "举头望明月，低头思故乡。", source: "李白《静夜思》" },
+            { image: "酒", verse: "对酒当歌，人生几何？", source: "曹操《短歌行》" },
+            { image: "花", verse: "感时花溅泪，恨别鸟惊心。", source: "杜甫《春望》" },
+            { image: "山", verse: "采菊东篱下，悠然见南山。", source: "陶渊明《饮酒》" },
+            { image: "水", verse: "抽刀断水水更流，举杯消愁愁更愁。", source: "李白《宣州谢朓楼饯别校书叔云》" },
+            { image: "风", verse: "夜来风雨声，花落知多少。", source: "孟浩然《春晓》" },
+            { image: "雪", verse: "孤舟蓑笠翁，独钓寒江雪。", source: "柳宗元《江雪》" },
+            { image: "柳", verse: "碧玉妆成一树高，万条垂下绿丝绦。", source: "贺知章《咏柳》" },
+            { image: "云", verse: "行到水窮處，坐看雲起時。", source: "王維《終南別業》" },
+            { image: "鸟", verse: "千山鸟飞绝，万径人踪灭。", source: "柳宗元《江雪》" },
+            { image: "舟", verse: "两岸猿声啼不住，轻舟已过万重山。", source: "李白《早发白帝城》" },
+            { image: "梦", verse: "醉后不知天在水，满船清梦压星河。", source: "唐温如《题龙阳县青草湖》" },
+            { image: "雨", verse: "清明时节雨纷纷，路上行人欲断魂。", source: "杜牧《清明》" },
+            { image: "日", verse: "白日依山尽，黄河入海流。", source: "王之涣《登鹳雀楼》" },
+            { image: "梅", verse: "墙角数枝梅，凌寒独自开。", source: "王安石《梅花》" },
+            { image: "剑", verse: "停杯投箸不能食，拔剑四顾心茫然。", source: "李白《行路难》" },
+            { image: "琴", verse: "独坐幽篁里，弹琴复长啸。", source: "王维《竹里馆》" },
+            { image: "书", verse: "读书破万卷，下笔如有神。", source: "杜甫《奉赠韦左丞丈二十二韵》" },
+            { image: "春", verse: "春眠不觉晓，处处闻啼鸟。", source: "孟浩然《春晓》" },
+            { image: "秋", verse: "空山新雨后，天气晚来秋。", source: "王维《山居秋暝》" },
+            { image: "马", verse: "乱花渐欲迷人眼，浅草才能没马蹄。", source: "白居易《钱塘湖春行》" },
+            { image: "松", verse: "明月松间照，清泉石上流。", source: "王维《山居秋暝》" },
+            { image: "竹", verse: "咬定青山不放松，立根原在破岩中。", source: "郑燮《竹石》" },
+            { image: "叶", verse: "不知细叶谁裁出，二月春风似剪刀。", source: "贺知章《咏柳》" },
+            { image: "红", verse: "等闲识得东风面，万紫千红总是春。", source: "朱熹《春日》" },
+            { image: "星", verse: "天阶夜色凉如水，卧看牵牛织女星。", source: "杜牧《秋夕》" },
+            { image: "江", verse: "野旷天低树，江清月近人。", source: "孟浩然《宿建德江》" },
+            { image: "河", verse: "大漠孤烟直，长河落日圆。", source: "王维《使至塞上》" },
+            { image: "乡", verse: "少小离家老大回，乡音无改鬓毛衰。", source: "贺知章《回乡偶书》" },
+            { image: "霜", verse: "月落乌啼霜满天，江枫渔火对愁眠。", source: "张继《枫桥夜泊》" },
+            { image: "烛", verse: "何当共剪西窗烛，却话巴山夜雨时。", source: "李商隐《夜雨寄北》" },
+            { image: "泪", verse: "蜡炬成灰泪始干。", source: "李商隐《无题》" },
+            { image: "门", verse: "柴门闻犬吠，风雪夜归人。", source: "刘长卿《逢雪宿芙蓉山主人》" },
+            { image: "楼", verse: "欲穷千里目，更上一层楼。", source: "王之涣《登鹳雀楼》" },
+            { image: "草", verse: "离离原上草，一岁一枯荣。", source: "白居易《赋得古原草送别》" },
+            { image: "石", verse: "清泉石上流。", source: "王维《山居秋暝》" }
+        ];
+
+        const rewards = [
+            "奖励：免做家务一次",
+            "奖励：对方为你吟诗一首",
+            "奖励：获得一杯奶茶",
+            "奖励：指定对方做一个鬼脸",
+            "惩罚：大声背诵《长恨歌》前四句",
+            "惩罚：做五个深蹲",
+            "惩罚：夸奖对方一分钟",
+            "惩罚：模仿古代诗人吟诗动作"
+        ];
+
+        // --- State Management ---
+        const app = document.getElementById('app');
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modalContent');
+        const closeModalBtn = document.getElementById('closeModal');
+
+        // Init Global Systems
+        VisualSys.init();
+        UserSys.init();
+
+        let gameState = {
+            mode: null, // 'single', 'local', 'feihua', 'match'
+            gridSize: 3,
+            cards: [], // { id, content, isTrap, isFlipped, isMatched }
+            turn: 'A', // 'A' or 'B'
+            scores: { A: 0, B: 0 },
+            trapsSet: { A: [], B: [] }, // Trap indices set by players
+            setupPhase: null, // 'setting_A', 'setting_B', 'playing'
+            history: [], // List of cards flipped for mind map
+            matchState: {
+                firstCard: null,
+                isChecking: false,
+                timeLeft: 0,
+                timerInterval: null
+            }
+        };
+
+        // --- Render Functions ---
+
+        function renderHome() {
+            AudioSys.init();
+            app.innerHTML = `
+                <div class="flex flex-col items-center justify-start w-full h-full pt-4 px-4">
+                    <div class="w-full max-w-6xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                        <!-- Single Player Card -->
+                        <div onclick="initSinglePlayerSetup()" class="group relative cursor-pointer bg-white/70 hover:bg-white transition-all duration-300 p-6 rounded-lg shadow-sm hover:shadow-2xl border border-[#e6e6e6] hover:border-indigo-300 text-center flex flex-col items-center gap-4 transform hover:-translate-y-1">
+                            <div class="w-16 h-16 rounded-full bg-indigo/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <span class="text-3xl text-indigo">🌙</span>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-indigo mb-2">单人修炼</h3>
+                                <p class="text-xs text-gray-500">品味古韵 · 深度赏析</p>
+                                <p class="text-xs text-gray-400 mt-1">翻阅诗篇，生成导图</p>
+                            </div>
+                            <div class="mt-2 text-indigo text-xs font-bold opacity-60 group-hover:opacity-100">点击进入 &rarr;</div>
+                        </div>
+
+                        <!-- Local Multiplayer Card -->
+                        <div onclick="initLocalMultiplayerSetup()" class="group relative cursor-pointer bg-white/70 hover:bg-white transition-all duration-300 p-6 rounded-lg shadow-sm hover:shadow-2xl border border-[#e6e6e6] hover:border-cinnabar-300 text-center flex flex-col items-center gap-4 transform hover:-translate-y-1">
+                            <div class="w-16 h-16 rounded-full bg-cinnabar/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <span class="text-3xl text-cinnabar">♟️</span>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-cinnabar mb-2">双人对弈</h3>
+                                <p class="text-xs text-gray-500">互相布阵 · 步步惊心</p>
+                                <p class="text-xs text-gray-400 mt-1">踩中陷阱判负</p>
+                            </div>
+                            <div class="mt-2 text-cinnabar text-xs font-bold opacity-60 group-hover:opacity-100">点击进入 &rarr;</div>
+                        </div>
+
+                        <!-- Fei Hua Mode Card -->
+                        <div onclick="initFeiHuaSetup()" class="group relative cursor-pointer bg-white/70 hover:bg-white transition-all duration-300 p-6 rounded-lg shadow-sm hover:shadow-2xl border border-[#e6e6e6] hover:border-bamboo-300 text-center flex flex-col items-center gap-4 transform hover:-translate-y-1">
+                            <div class="w-16 h-16 rounded-full bg-bamboo/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <span class="text-3xl text-bamboo">🌸</span>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-bamboo mb-2">飞花传秀</h3>
+                                <p class="text-xs text-gray-500">互相布阵 · 经典意象</p>
+                                <p class="text-xs text-gray-400 mt-1">云端对决，陷阱判负</p>
+                            </div>
+                            <div class="mt-2 text-bamboo text-xs font-bold opacity-60 group-hover:opacity-100">点击进入 &rarr;</div>
+                        </div>
+
+                        <!-- Innovation Mode: Match Game -->
+                        <div onclick="initMatchGameSetup()" class="group relative cursor-pointer bg-white/70 hover:bg-white transition-all duration-300 p-6 rounded-lg shadow-sm hover:shadow-2xl border border-[#e6e6e6] hover:border-gold-300 text-center flex flex-col items-center gap-4 transform hover:-translate-y-1">
+                            <div class="w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <span class="text-3xl text-gold">🧩</span>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-gold mb-2">灵犀相通</h3>
+                                <p class="text-xs text-gray-500">限时挑战 · 记忆连线</p>
+                                <p class="text-xs text-gray-400 mt-1">将意象与诗句配对</p>
+                            </div>
+                            <div class="mt-2 text-gold text-xs font-bold opacity-60 group-hover:opacity-100">点击进入 &rarr;</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-12 text-center opacity-60">
+                         <div class="w-16 h-1 bg-gradient-to-r from-transparent via-gold to-transparent mx-auto mb-4"></div>
+                        <p class="text-sm font-serif italic text-gray-600">"腹有诗书气自华"</p>
+                        <p class="text-xs text-gray-400 mt-2">点击右上角等级图标查看成就</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Single Player ---
+
+        function initSinglePlayerSetup() {
+            app.innerHTML = `
+                <div class="flex flex-col items-center w-full max-w-2xl animate-fade-in-up">
+                    <button onclick="renderHome()" class="self-start mb-4 text-sm text-gray-500 hover:text-ink">← 返回首页</button>
+                    <h2 class="text-2xl font-bold mb-2">单人修炼</h2>
+                    <p class="mb-6 text-gray-600 text-center">规则：无陷阱，尽情翻阅。翻开后请品读背诵，<br>集齐所有卡片后自动生成【诗词导图】。</p>
+                    
+                    <div class="flex gap-4 mb-8">
+                        <button onclick="startSingleGame(3)" class="px-6 py-3 bg-white border border-indigo text-indigo hover:bg-indigo hover:text-white rounded shadow-sm hover:shadow transition">3 × 3 (简单)</button>
+                        <button onclick="startSingleGame(4)" class="px-6 py-3 bg-white border border-indigo text-indigo hover:bg-indigo hover:text-white rounded shadow-sm hover:shadow transition">4 × 4 (中等)</button>
+                        <button onclick="startSingleGame(5)" class="px-6 py-3 bg-white border border-indigo text-indigo hover:bg-indigo hover:text-white rounded shadow-sm hover:shadow transition">5 × 5 (困难)</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function startSingleGame(size) {
+            gameState.mode = 'single';
+            gameState.gridSize = size;
+            gameState.history = [];
+            
+            // Generate Cards
+            const totalCards = size * size;
+            let deck = [...mainDatabase].sort(() => 0.5 - Math.random()).slice(0, totalCards);
+            
+            gameState.cards = deck.map((item, index) => ({
+                id: index,
+                ...item,
+                isTrap: false,
+                isFlipped: false,
+                state: 'hidden'
+            }));
+
+            renderGrid();
+        }
+
+        // --- Local Multiplayer ---
+
+        function initLocalMultiplayerSetup() {
+            app.innerHTML = `
+                <div class="flex flex-col items-center w-full max-w-2xl text-center animate-fade-in-up">
+                     <button onclick="renderHome()" class="self-start mb-4 text-sm text-gray-500 hover:text-ink">← 返回首页</button>
+                    <h2 class="text-2xl font-bold mb-4">双人对弈 (6×6)</h2>
+                    <p class="mb-6">规则：双方轮流在同一棋盘上布置1个“墨渍”陷阱。<br>布阵完成后，开始对战，踩中陷阱者判负。</p>
+                    <button onclick="startMultiplayerSetupPhase('local')" class="px-8 py-3 bg-cinnabar text-white rounded text-lg font-bold shadow-lg hover:scale-105 transition">开始布阵</button>
+                </div>
+            `;
+        }
+
+        // --- Fei Hua Mode ---
+        function initFeiHuaSetup() {
+            app.innerHTML = `
+                <div class="flex flex-col items-center w-full max-w-2xl text-center animate-fade-in-up">
+                     <button onclick="renderHome()" class="self-start mb-4 text-sm text-gray-500 hover:text-ink">← 返回首页</button>
+                    <h2 class="text-2xl font-bold mb-4">飞花传秀 (6×6)</h2>
+                    <p class="mb-6">规则：使用经典单字意象卡牌（如：月、酒、花）。<br>双方轮流布下陷阱（墨渍），随后对弈。踩中陷阱者判负。</p>
+                    <button onclick="startMultiplayerSetupPhase('feihua')" class="px-8 py-3 bg-bamboo text-white rounded text-lg font-bold shadow-lg hover:scale-105 transition">开始对决</button>
+                </div>
+            `;
+        }
+
+        // --- Innovation Mode: Match Game ---
+        function initMatchGameSetup() {
+            app.innerHTML = `
+                <div class="flex flex-col items-center w-full max-w-2xl text-center animate-fade-in-up">
+                     <button onclick="renderHome()" class="self-start mb-4 text-sm text-gray-500 hover:text-ink">← 返回首页</button>
+                    <h2 class="text-2xl font-bold mb-2">灵犀相通</h2>
+                    <p class="mb-2 text-sm text-gold font-bold">限时记忆 · 意象配对</p>
+                    <p class="mb-6 text-gray-600">规则：卡片分为 <span class="text-cinnabar font-bold">红色意象卡</span> 与 <span class="text-indigo font-bold">蓝色诗句卡</span>。<br>请在限时内，将意象（如：月）与包含该意象的诗句卡片配对消除。</p>
+                    
+                    <div class="flex gap-4 mb-8">
+                        <button onclick="startMatchGame(4, 70)" class="px-8 py-3 bg-white border border-gold text-gold hover:bg-gold hover:text-white rounded shadow-sm hover:shadow transition text-lg font-bold">开始挑战 (4x4, 70秒)</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function startMatchGame(size, time) {
+            gameState.mode = 'match';
+            gameState.gridSize = size;
+            gameState.matchState.timeLeft = time;
+            gameState.matchState.firstCard = null;
+            gameState.matchState.isChecking = false;
+            
+            // Generate Pairs
+            const pairCount = (size * size) / 2;
+            let sourceDeck = [...mainDatabase].sort(() => 0.5 - Math.random()).slice(0, pairCount);
+            
+            // Create A (Image) and B (Verse) cards
+            let deck = [];
+            sourceDeck.forEach((item, index) => {
+                // Card A: Image
+                deck.push({
+                    id: index * 2,
+                    pairId: index,
+                    type: 'image',
+                    text: item.image,
+                    subtext: '意象',
+                    fullItem: item,
+                    isFlipped: false,
+                    isMatched: false
+                });
+                // Card B: Verse
+                deck.push({
+                    id: index * 2 + 1,
+                    pairId: index,
+                    type: 'verse',
+                    text: item.verse,
+                    subtext: item.source,
+                    fullItem: item,
+                    isFlipped: false,
+                    isMatched: false
+                });
+            });
+            
+            gameState.cards = deck.sort(() => 0.5 - Math.random());
+            
+            renderMatchGame();
+            startTimer();
+        }
+
+        function startTimer() {
+            if (gameState.matchState.timerInterval) clearInterval(gameState.matchState.timerInterval);
+            gameState.matchState.timerInterval = setInterval(() => {
+                gameState.matchState.timeLeft--;
+                const bar = document.getElementById('timer-bar');
+                const text = document.getElementById('timer-text');
+                if (bar && text) {
+                    const percent = (gameState.matchState.timeLeft / (gameState.gridSize === 4 ? 60 : 90)) * 100;
+                    bar.style.width = percent + '%';
+                    text.innerText = gameState.matchState.timeLeft + 's';
+                    
+                    if (percent < 30) bar.classList.add('bg-red-500');
+                }
+                
+                if (gameState.matchState.timeLeft <= 0) {
+                    clearInterval(gameState.matchState.timerInterval);
+                    endMatchGame(false);
+                }
+            }, 1000);
+        }
+
+        function renderMatchGame() {
+            const gridClass = `grid-cols-${gameState.gridSize}`;
+            
+            app.innerHTML = `
+                <div class="relative w-full max-w-2xl px-4 flex flex-col items-center">
+                    <div class="w-full flex justify-between items-end mb-2">
+                        <button onclick="clearInterval(gameState.matchState.timerInterval); renderHome()" class="px-3 py-1 text-xs border border-gray-400 rounded text-gray-600 hover:bg-gray-100 transition">退出</button>
+                        <div class="text-right">
+                             <div class="text-xs text-gray-500">一炷香</div>
+                             <div class="text-xl font-mono font-bold text-gold" id="timer-text">${gameState.matchState.timeLeft}s</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Timer Bar -->
+                    <div class="w-full h-2 bg-gray-200 rounded-full mb-6 overflow-hidden">
+                        <div id="timer-bar" class="h-full bg-gold transition-all duration-1000 ease-linear" style="width: 100%"></div>
+                    </div>
+
+                    <div class="grid ${gridClass} gap-2 w-full perspective">
+                        ${gameState.cards.map(card => `
+                            <div class="card w-full aspect-square cursor-pointer ${card.isFlipped ? 'flipped' : ''} ${card.isMatched ? 'opacity-0 pointer-events-none' : ''}" 
+                                 onclick="handleMatchClick(${card.id})"
+                                 style="transition: opacity 0.5s, transform 0.6s;">
+                                <div class="card-inner">
+                                    <div class="card-front bg-white border-2 border-gold/30 flex items-center justify-center">
+                                        <div class="w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center">
+                                            <span class="text-gold text-lg">?</span>
+                                        </div>
+                                    </div>
+                                    <div class="card-back ${card.type === 'image' ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'} border-2 text-center flex flex-col items-center justify-center p-1">
+                                        ${card.type === 'image' 
+                                            ? `<span class="text-2xl font-bold text-cinnabar mb-1">${card.text}</span><span class="text-[10px] text-red-400 border border-red-200 px-1 rounded">意象</span>` 
+                                            : `<span class="text-[10px] sm:text-xs font-bold text-indigo leading-tight mb-1 line-clamp-3">${card.text}</span><span class="text-[8px] text-indigo-400 scale-90">${card.subtext}</span>`
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleMatchClick(id) {
+            if (gameState.matchState.isChecking) return;
+            
+            const card = gameState.cards.find(c => c.id === id);
+            if (card.isFlipped || card.isMatched) return;
+
+            AudioSys.playFlip();
+            card.isFlipped = true;
+            renderMatchGame();
+
+            if (!gameState.matchState.firstCard) {
+                // First card flipped
+                gameState.matchState.firstCard = card;
+            } else {
+                // Second card flipped
+                gameState.matchState.isChecking = true;
+                const first = gameState.matchState.firstCard;
+                
+                if (first.pairId === card.pairId) {
+                    // Match!
+                    AudioSys.playWin(); // Use win sound for match
+                    setTimeout(() => {
+                        first.isMatched = true;
+                        card.isMatched = true;
+                        gameState.matchState.firstCard = null;
+                        gameState.matchState.isChecking = false;
+                        
+                        // Check Win
+                        if (gameState.cards.every(c => c.isMatched)) {
+                            clearInterval(gameState.matchState.timerInterval);
+                            endMatchGame(true);
+                        } else {
+                            renderMatchGame();
+                        }
+                    }, 600);
+                } else {
+                    // No Match
+                    setTimeout(() => {
+                        first.isFlipped = false;
+                        card.isFlipped = false;
+                        gameState.matchState.firstCard = null;
+                        gameState.matchState.isChecking = false;
+                        renderMatchGame();
+                    }, 1000);
+                }
+            }
+        }
+
+        function endMatchGame(isWin) {
+            const title = isWin ? "灵犀相通" : "时辰已到";
+            const color = isWin ? "text-gold" : "text-gray-500";
+            const msg = isWin ? "恭喜！您成功还原了所有诗词意象。" : "很遗憾，未能完成所有配对。";
+            
+            let xpMsg = "";
+            let stampHtml = "";
+            
+            if (isWin) {
+                const xpGain = gameState.gridSize * 15;
+                UserSys.addXP(xpGain);
+                UserSys.addStamp('敏捷');
+                xpMsg = `<p class="mt-2 text-xs font-bold text-gold">+${xpGain} 学识值</p>`;
+                stampHtml = `<div class="absolute top-0 right-0 stamp-seal">敏捷</div>`;
+            }
+
+            showModal(`
+                <div class="text-center relative">
+                    ${stampHtml}
+                    <h2 class="text-3xl font-bold mb-4 ${color}">${title}</h2>
+                    <p class="mb-2 text-gray-600">${msg}</p>
+                    ${xpMsg}
+                    <div class="flex justify-center gap-4 mt-6">
+                        <button onclick="closeModal(); initMatchGameSetup();" class="px-6 py-2 border border-gold text-gold rounded hover:bg-gold hover:text-white transition">再试一次</button>
+                        <button onclick="closeModal(); renderHome();" class="px-6 py-2 bg-gray-800 text-white rounded hover:bg-black transition">返回首页</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        function startMultiplayerSetupPhase(mode) {
+            gameState.mode = mode; // 'local' or 'feihua'
+            gameState.gridSize = 6;
+            gameState.scores = { A: 0, B: 0 };
+            gameState.turn = 'A';
+            gameState.history = [];
+            gameState.trapsSet = { A: [], B: [] };
+
+            const totalCards = 36;
+            let sourceDB = (mode === 'feihua') ? feihuaDatabase : mainDatabase;
+            let deck = [...sourceDB].sort(() => 0.5 - Math.random()).slice(0, totalCards);
+            
+            gameState.cards = deck.map((item, index) => ({
+                id: index,
+                ...item,
+                isTrap: false, 
+                isFlipped: false,
+                trapOwner: null
+            }));
+
+            // Trap setup for BOTH modes now
+            gameState.setupPhase = 'setting_A';
+            renderTrapSetup('A');
+        }
+
+        function renderTrapSetup(player) {
+            const playerName = player === 'A' ? '玩家 A (红方)' : '玩家 B (蓝方)';
+            const colorClass = player === 'A' ? 'text-cinnabar' : 'text-indigo';
+            const currentCount = gameState.trapsSet[player].length;
+            const limit = 1;
+            
+            app.innerHTML = `
+                <div class="flex flex-col items-center w-full">
+                    <h2 class="text-2xl font-bold mb-2 ${colorClass}">${playerName} 布阵</h2>
+                    <p class="mb-4 text-sm text-gray-600">请选择 <span class="font-bold text-black">1</span> 张卡片作为陷阱（墨渍）</p>
+                    <div id="grid-container" class="grid gap-2 mb-6" style="grid-template-columns: repeat(6, minmax(0, 1fr));">
+                        ${gameState.cards.map(card => `
+                            <div onclick="selectTrap(${card.id}, '${player}')" 
+                                 class="w-10 h-10 sm:w-14 sm:h-14 bg-white border border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-100 transition rounded
+                                 ${gameState.trapsSet[player].includes(card.id) ? (player === 'A' ? 'bg-red-100 border-red-500 ring-2 ring-red-200' : 'bg-blue-100 border-blue-500 ring-2 ring-blue-200') : ''}">
+                                <span class="text-[10px] sm:text-xs text-gray-400">${card.image}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="text-xs text-gray-500 mb-4">点击棋盘选择一个位置</div>
+                    <button onclick="confirmTraps('${player}')" class="px-6 py-2 bg-gray-800 text-white rounded hover:bg-black disabled:opacity-50 transition" ${currentCount < limit ? 'disabled' : ''}>
+                        确认布阵 (${currentCount}/${limit})
+                    </button>
+                </div>
+            `;
+        }
+
+        function selectTrap(id, player) {
+            AudioSys.playFlip(); // Sound feedback
+            // Limit to 1, replace if exists
+            gameState.trapsSet[player] = [id]; 
+            renderTrapSetup(player);
+        }
+
+        function confirmTraps(player) {
+            if (player === 'A') {
+                gameState.setupPhase = 'setting_B';
+                // Interstitial
+                app.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-64 animate-pulse">
+                        <h2 class="text-2xl font-bold mb-4">请玩家 A 离屏</h2>
+                        <button onclick="renderTrapSetup('B')" class="px-6 py-2 bg-indigo text-white rounded shadow-lg">玩家 B 开始布阵</button>
+                    </div>
+                `;
+            } else {
+                gameState.setupPhase = 'playing';
+                app.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-64">
+                        <h2 class="text-2xl font-bold mb-4">布阵完成！</h2>
+                        <p class="mb-4 text-gray-600">游戏开始，由 玩家 A 先手。</p>
+                        <button onclick="renderGrid()" class="px-6 py-2 bg-cinnabar text-white rounded shadow-lg hover:scale-105 transition">开始对弈</button>
+                    </div>
+                `;
+            }
+        }
+
+        // --- Core Gameplay UI ---
+
+        function renderGrid() {
+            // Safety check for match mode calling wrong render
+            if (gameState.mode === 'match') {
+                renderMatchGame();
+                return;
+            }
+
+            const isMulti = (gameState.mode === 'local' || gameState.mode === 'feihua');
+            const gridClass = isMulti ? `grid-cols-6` : `grid-cols-${gameState.gridSize}`;
+            const maxWidth = isMulti ? 'max-w-4xl' : 'max-w-xl';
+            
+            let headerHTML = '';
+            if (gameState.mode === 'single') {
+                headerHTML = `
+                    <div class="mb-4 text-center">
+                        <button onclick="renderHome()" class="px-4 py-1 text-xs border border-gray-400 rounded text-gray-600 mb-2 hover:bg-gray-100 transition">退出游戏</button>
+                        <h2 class="text-xl font-bold text-indigo">品味古韵</h2>
+                    </div>
+                `;
+            } else {
+                headerHTML = `
+                    <div class="relative w-full mb-4 px-4">
+                        <div class="absolute top-0 right-4">
+                             <button onclick="renderHome()" class="text-xs text-gray-400 hover:text-cinnabar border border-gray-300 rounded px-2 py-1 bg-white">退出</button>
+                        </div>
+                        <div class="flex justify-between items-center bg-white/50 p-2 rounded-lg mt-6">
+                            <div class="text-center p-2 rounded border-b-2 ${gameState.turn === 'A' ? 'border-cinnabar bg-red-50' : 'border-transparent opacity-50'} transition-all">
+                                <h3 class="text-cinnabar font-bold text-sm">玩家 A (红)</h3>
+                                <p class="text-2xl font-mono">${gameState.scores.A}</p>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-xs text-gray-400 mb-1">当前回合</div>
+                                <div class="text-xl font-bold ${gameState.turn === 'A' ? 'text-cinnabar' : 'text-indigo'}">
+                                    ${gameState.turn === 'A' ? 'A' : 'B'}
+                                </div>
+                            </div>
+                            <div class="text-center p-2 rounded border-b-2 ${gameState.turn === 'B' ? 'border-indigo bg-blue-50' : 'border-transparent opacity-50'} transition-all">
+                                <h3 class="text-indigo font-bold text-sm">玩家 B (蓝)</h3>
+                                <p class="text-2xl font-mono">${gameState.scores.B}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            app.innerHTML = `
+                ${headerHTML}
+                <div class="grid ${gridClass} gap-2 sm:gap-4 w-full ${maxWidth} mx-auto perspective px-2">
+                    ${gameState.cards.map(card => `
+                        <div class="card w-full aspect-square cursor-pointer ${card.isFlipped ? 'flipped' : ''}" onclick="handleCardClick(${card.id})">
+                            <div class="card-inner">
+                                <div class="card-front bg-white hover:bg-orange-50 transition-colors duration-300">
+                                    <span class="text-lg sm:text-2xl font-bold font-serif opacity-90">${card.image}</span>
+                                </div>
+                                <div class="card-back ${getCardBackClass(card)}">
+                                    ${getCardBackContent(card)}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                ${isMulti ? `
+                    <div class="mt-6 flex gap-4">
+                        <button onclick="scorePlayer(1)" class="px-6 py-2 bg-bamboo text-white rounded shadow hover:bg-green-700 transition flex items-center gap-2">
+                            <span>✅</span> 背诵正确 (+1)
+                        </button>
+                        <button onclick="nextTurn()" class="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition">
+                            跳过 / 未背出
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">点击卡片后，请对手判断背诵是否正确。</p>
+                ` : ''}
+            `;
+        }
+
+        function getCardBackClass(card) {
+            if (card.state === 'trap') return 'bg-gray-800 text-white border-2 border-black ink-reveal';
+            if (card.state === 'safe') return 'bg-[#f0f9eb] text-[#3c763d] border border-[#d6e9c6]';
+            return 'bg-white';
+        }
+
+        function getCardBackContent(card) {
+            if (card.state === 'trap') {
+                return `
+                    <div class="text-4xl mb-2 animate-bounce">🖌️</div>
+                    <div class="font-bold text-lg">墨渍!</div>
+                `;
+            }
+            // For single player, add a Detail button
+            const detailBtn = (gameState.mode === 'single') 
+                ? `<button onclick="showCardDetail(${card.id}); event.stopPropagation();" class="mt-1 text-[8px] bg-indigo/10 text-indigo px-1 rounded border border-indigo/20 hover:bg-indigo hover:text-white transition">赏析</button>` 
+                : '';
+
+            return `
+                <div class="flex flex-col items-center justify-center h-full w-full">
+                    <div class="text-[10px] sm:text-sm font-bold mb-1 leading-snug px-1 select-text">${card.verse}</div>
+                    <div class="text-[9px] text-gray-500 scale-90">${card.source}</div>
+                    ${detailBtn}
+                </div>
+            `;
+        }
+
+        function showCardDetail(id) {
+            const card = gameState.cards.find(c => c.id === id);
+            if (!card) return;
+            
+            showModal(`
+                <div class="text-center">
+                    <div class="w-16 h-16 mx-auto bg-indigo/10 rounded-full flex items-center justify-center text-2xl text-indigo font-bold mb-4 border border-indigo/20">
+                        ${card.image}
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">${card.source}</h3>
+                    <p class="text-lg font-serif mb-6 text-gray-800">"${card.verse}"</p>
+                    
+                    <div class="bg-paper p-4 text-left text-sm text-gray-600 rounded border border-gray-200 leading-relaxed">
+                        <span class="font-bold text-cinnabar">【意象赏析】</span><br>
+                        此诗句中“<span class="font-bold text-black">${card.image}</span>”意象，常寄托诗人特定情感。
+                        在古诗词中，它往往不仅是眼前之景，更是心中之情。
+                        <br><br>
+                        <span class="font-bold text-indigo">【学习笔记】</span><br>
+                        建议大声朗读三遍，体会音律之美。
+                    </div>
+
+                    <div class="mt-6">
+                        <button onclick="closeModal()" class="px-6 py-2 bg-indigo text-white rounded hover:bg-indigo-700">关闭</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        // --- Game Logic ---
+
+        function handleCardClick(id) {
+            // Redirect for Match Mode
+            if (gameState.mode === 'match') {
+                handleMatchClick(id);
+                return;
+            }
+
+            const card = gameState.cards.find(c => c.id === id);
+            if (card.isFlipped) return; 
+
+            // Play Flip Sound
+            AudioSys.playFlip();
+
+            // Update state
+            card.isFlipped = true;
+
+            // Single Player: Always Safe
+            if (gameState.mode === 'single') {
+                card.state = 'safe';
+                gameState.history.push(card);
+                
+                renderGrid();
+                
+                // End game check for single
+                const allFlipped = gameState.cards.every(c => c.isFlipped);
+                if (allFlipped) {
+                    AudioSys.playWin();
+                    setTimeout(() => endGameSingle(true), 800);
+                }
+            } 
+            // Multiplayer (Local & Fei Hua): Traps Active
+            else {
+                const opponent = gameState.turn === 'A' ? 'B' : 'A';
+                
+                // Check if opponent's trap
+                if (gameState.trapsSet[opponent] && gameState.trapsSet[opponent].includes(card.id)) {
+                    card.state = 'trap';
+                    AudioSys.playInk(); // Play Ink Sound
+                    renderGrid();
+                    setTimeout(() => endGameMulti(false), 1200); // Delay for animation
+                    return;
+                }
+
+                // Safe
+                card.state = 'safe'; 
+                renderGrid();
+            }
+        }
+
+        function scorePlayer(points) {
+            if (!['local', 'feihua'].includes(gameState.mode)) return;
+            gameState.scores[gameState.turn] += points;
+            nextTurn();
+        }
+
+        function nextTurn() {
+            if (!['local', 'feihua'].includes(gameState.mode)) return;
+            
+            // Check termination conditions
+            const flippedCount = gameState.cards.filter(c => c.isFlipped).length;
+            let isGameOver = false;
+
+            if (gameState.mode === 'local') {
+                // Should trap mode end if board full? Rare, but yes.
+                // Or usually ends by trap.
+                if (flippedCount >= gameState.cards.length) isGameOver = true;
+            } else if (gameState.mode === 'feihua') {
+                if (flippedCount >= gameState.cards.length) isGameOver = true;
+            }
+
+            if (isGameOver) {
+                AudioSys.playWin();
+                endGameMulti(true);
+                return;
+            }
+
+            gameState.turn = gameState.turn === 'A' ? 'B' : 'A';
+            renderGrid();
+        }
+
+        // --- End Game Handling ---
+
+        function endGameSingle(complete) {
+            // Gamification: Add XP and Stamp
+            const xpGain = gameState.gridSize * 10;
+            UserSys.addXP(xpGain);
+            UserSys.addStamp('勤学');
+
+            let content = `
+                <div class="text-center relative">
+                    <div class="absolute top-0 right-0 stamp-seal">勤学</div>
+                    <h2 class="text-3xl font-bold text-cinnabar mb-2">功德圆满</h2>
+                    <p class="mb-1 text-sm text-gray-500">您已鉴赏完所有卡片</p>
+                    <p class="mb-4 text-xs font-bold text-gold">+${xpGain} 学识值</p>
+                </div>
+            `;
+
+            content += `<h3 class="font-bold text-lg border-b border-gray-300 pb-2 mb-4 mt-6">本局诗词导图</h3>`;
+            content += `<div class="grid grid-cols-1 gap-3 max-h-[50vh] overflow-y-auto pr-2">`;
+            
+            if (gameState.history.length === 0) content += `<p class="text-gray-400">暂无收集。</p>`;
+
+            gameState.history.forEach((item, i) => {
+                content += `
+                    <div class="flex items-center bg-white border border-gray-100 rounded-lg p-3 w-full text-left shadow-sm hover:shadow-md transition" style="animation: fadeIn 0.4s ease backwards ${i*0.05}s">
+                        <div class="w-10 h-10 rounded-full bg-indigo/10 text-indigo flex items-center justify-center font-bold mr-3 shrink-0 border border-indigo/20">
+                            ${item.image}
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-gray-800">${item.verse}</p>
+                            <p class="text-[10px] text-gray-500 mt-1">${item.source}</p>
+                        </div>
+                        <button onclick="showCardDetail(${item.id})" class="ml-auto text-xs text-indigo underline opacity-50 hover:opacity-100">赏析</button>
+                    </div>
+                `;
+            });
+            content += `</div>`;
+            content += `<style>@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }</style>`;
+            
+            content += `
+                <div class="mt-8 text-center flex justify-center gap-4 border-t pt-4">
+                     <button onclick="closeModal(); initSinglePlayerSetup();" class="px-6 py-2 border border-indigo text-indigo rounded hover:bg-indigo hover:text-white transition">再来一局</button>
+                     <button onclick="closeModal(); renderHome();" class="px-6 py-2 bg-indigo text-white rounded hover:bg-indigo-700 transition">返回首页</button>
+                </div>
+            `;
+
+            showModal(content);
+        }
+
+        function endGameMulti(byScoreCheck) {
+            const winner = gameState.scores.A > gameState.scores.B ? 'A' : (gameState.scores.B > gameState.scores.A ? 'B' : 'Tie');
+            
+            // Add XP for playing multiplayer
+            UserSys.addXP(20);
+            
+            let title = "雅集结束";
+            let resultText = "";
+            let colorClass = "text-gray-800";
+            
+            if (winner === 'Tie') {
+                resultText = "平局！双方势均力敌。";
+            } else {
+                const winnerName = winner === 'A' ? '玩家 A' : '玩家 B';
+                colorClass = winner === 'A' ? 'border-cinnabar' : 'border-indigo';
+                const bgClass = winner === 'A' ? 'bg-red-50' : 'bg-blue-50';
+                
+                const randomReward = rewards[Math.floor(Math.random() * rewards.length)];
+                
+                resultText = `
+                    <div class="border-4 ${colorClass} ${bgClass} p-6 rounded-lg mb-6 shadow-inner">
+                        <h3 class="text-2xl font-bold mb-2">获胜者：${winnerName}</h3>
+                        <p class="text-lg mb-4">最终得分：${gameState.scores[winner]}</p>
+                        
+                        <div class="bg-white/60 p-4 rounded border border-gray-200">
+                             <p class="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">命运卡牌</p>
+                             <p class="text-xl font-bold text-ink">${randomReward}</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-center gap-8 text-sm text-gray-500 font-mono">
+                        <div class="p-2 bg-gray-100 rounded">A: ${gameState.scores.A}</div>
+                        <div class="p-2 bg-gray-100 rounded">B: ${gameState.scores.B}</div>
+                    </div>
+                `;
+            }
+
+            // Determine correct restart function
+            let restartAction = "";
+            if (gameState.mode === 'local') {
+                restartAction = "startMultiplayerSetupPhase('local')";
+            } else {
+                restartAction = "startMultiplayerSetupPhase('feihua')";
+            }
+
+            showModal(`
+                <div class="text-center">
+                    <h2 class="text-3xl font-bold mb-6 tracking-widest text-ink">${title}</h2>
+                    ${resultText}
+                    <div class="mt-8 flex justify-center gap-4">
+                         <button onclick="closeModal(); ${restartAction};" class="px-6 py-2 border border-gray-800 text-gray-800 rounded hover:bg-gray-100 transition">再来一局</button>
+                         <button onclick="closeModal(); renderHome();" class="px-6 py-2 bg-gray-800 text-white rounded hover:bg-black transition">返回首页</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        // --- Utilities ---
+
+        function showModal(html) {
+            modalContent.innerHTML = html;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // Trigger reflow for transition
+            void modal.offsetWidth;
+            modal.firstElementChild.classList.remove('scale-95', 'opacity-0');
+            modal.firstElementChild.classList.add('scale-100', 'opacity-100');
+        }
+
+        function closeModal() {
+            modal.firstElementChild.classList.remove('scale-100', 'opacity-100');
+            modal.firstElementChild.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 200);
+        }
+
+        closeModalBtn.addEventListener('click', closeModal);
+
+        // --- Init ---
+        renderHome();
+
+    </script>
+</body>
+</html>
