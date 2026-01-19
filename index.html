@@ -1064,6 +1064,7 @@
             gameState.turn = 'A';
             gameState.history = [];
             gameState.trapsSet = { A: [], B: [] };
+            gameState.isWaitingForAction = false; // New flag for locking board
 
             const totalCards = 36;
             let sourceDB = (mode === 'feihua') ? feihuaDatabase : mainDatabase;
@@ -1188,8 +1189,19 @@
             app.innerHTML = `
                 ${headerHTML}
                 <div class="grid ${gridClass} gap-2 sm:gap-4 w-full ${maxWidth} mx-auto perspective px-2">
-                    ${gameState.cards.map(card => `
-                        <div class="card w-full aspect-square cursor-pointer ${card.isFlipped ? 'flipped' : ''}" onclick="handleCardClick(${card.id})">
+                    ${gameState.cards.map(card => {
+                        // Logic: If waiting for action, gray out everything EXCEPT the flipped card
+                        let dimStyle = '';
+                        if (gameState.mode !== 'single' && gameState.mode !== 'match' && gameState.isWaitingForAction) {
+                            if (!card.isFlipped) {
+                                dimStyle = 'opacity-20 grayscale pointer-events-none filter blur-[1px]';
+                            }
+                        }
+                        
+                        return `
+                        <div class="card w-full aspect-square cursor-pointer ${card.isFlipped ? 'flipped' : ''} ${dimStyle}" 
+                             onclick="handleCardClick(${card.id})"
+                             style="transition: all 0.3s ease;">
                             <div class="card-inner">
                                 <div class="card-front bg-white hover:bg-orange-50 transition-colors duration-300">
                                     <span class="text-lg sm:text-2xl font-bold font-serif opacity-90">${card.image}</span>
@@ -1199,10 +1211,10 @@
                                 </div>
                             </div>
                         </div>
-                    `).join('')}
+                    `}).join('')}
                 </div>
                 ${isMulti ? `
-                    <div class="mt-6 flex gap-4">
+                    <div class="mt-6 flex gap-4 transition-all duration-300 ${gameState.isWaitingForAction ? 'opacity-100 translate-y-0' : 'opacity-50 translate-y-2 pointer-events-none'}">
                         <button onclick="scorePlayer(1)" class="px-6 py-2 bg-bamboo text-white rounded shadow hover:bg-green-700 transition flex items-center gap-2">
                             <span>✅</span> 背诵正确 (+1)
                         </button>
@@ -1210,7 +1222,7 @@
                             跳过 / 未背出
                         </button>
                     </div>
-                    <p class="text-xs text-gray-400 mt-2">点击卡片后，请对手判断背诵是否正确。</p>
+                    <p class="text-xs text-gray-400 mt-2 h-4">${gameState.isWaitingForAction ? '请对手判断背诵是否正确，并点击按钮继续。' : '请 ' + (gameState.turn === 'A' ? '玩家 A' : '玩家 B') + ' 翻开一张卡片。'}</p>
                 ` : ''}
             `;
         }
@@ -1279,6 +1291,11 @@
                 return;
             }
 
+            // Multiplayer Lock Check
+            if ((gameState.mode === 'local' || gameState.mode === 'feihua') && gameState.isWaitingForAction) {
+                return; // Board locked until score is decided
+            }
+
             const card = gameState.cards.find(c => c.id === id);
             if (card.isFlipped) return; 
 
@@ -1302,21 +1319,25 @@
                     setTimeout(() => endGameSingle(true), 800);
                 }
             } 
-            // Multiplayer (Local & Fei Hua): Traps Active
+            // Multiplayer (Local & Fei Hua)
             else {
+                // Check Trap Logic (Only if NOT Fei Hua, or logic specific)
+                // Note: User requested Mode 3 (Fei Hua) to HAVE traps now.
                 const opponent = gameState.turn === 'A' ? 'B' : 'A';
-                
-                // Check if opponent's trap
-                if (gameState.trapsSet[opponent] && gameState.trapsSet[opponent].includes(card.id)) {
+                const hasTrap = gameState.trapsSet[opponent] && gameState.trapsSet[opponent].includes(card.id);
+
+                if (hasTrap) {
                     card.state = 'trap';
                     AudioSys.playInk(); // Play Ink Sound
                     renderGrid();
-                    setTimeout(() => endGameMulti(false), 1200); // Delay for animation
+                    // Game ends immediately on trap, no need to lock for scoring
+                    setTimeout(() => endGameMulti(false), 1200); 
                     return;
                 }
 
-                // Safe
+                // Safe Card - Lock board and wait for scoring
                 card.state = 'safe'; 
+                gameState.isWaitingForAction = true; // Lock
                 renderGrid();
             }
         }
@@ -1330,13 +1351,14 @@
         function nextTurn() {
             if (!['local', 'feihua'].includes(gameState.mode)) return;
             
+            // Unlock board
+            gameState.isWaitingForAction = false;
+
             // Check termination conditions
             const flippedCount = gameState.cards.filter(c => c.isFlipped).length;
             let isGameOver = false;
 
             if (gameState.mode === 'local') {
-                // Should trap mode end if board full? Rare, but yes.
-                // Or usually ends by trap.
                 if (flippedCount >= gameState.cards.length) isGameOver = true;
             } else if (gameState.mode === 'feihua') {
                 if (flippedCount >= gameState.cards.length) isGameOver = true;
